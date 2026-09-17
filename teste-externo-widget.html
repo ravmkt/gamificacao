@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Loja Externa de Teste — Simulação do Widget Gamifica</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 40px; background: #f8fafc; }
+    h1 { color: #1e293b; }
+    .produto { background: white; border-radius: 12px; padding: 24px; max-width: 400px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  </style>
+</head>
+<body>
+  <h1>🛍️ Loja Externa de Teste</h1>
+  <p>Esta página simula uma loja de e-commerce real com o widget instalado via GTM.</p>
+  <div class="produto">
+    <h2>Tênis Runner Pro</h2>
+    <p>R$ 349,90</p>
+    <button>Adicionar ao carrinho</button>
+  </div>
+
+  <!-- Snippet equivalente ao gerado na tela de Instalação do painel -->
+  <script>
+    (function(w,d,s,k){
+      w.dataLayer = w.dataLayer || [];
+      var f = d.createElement(s);
+      f.async = true;
+      f.src = 'https://3000-iwrb2l3syswgk51j4lon1-b9b802c4.sandbox.novita.ai/widget.js';
+      f.setAttribute('data-gamifica-key', k);
+      d.head.appendChild(f);
+    })(window, document, 'script', 'pk_Wo2IyErdjFXz9r3mBjr6tP7uIt28r4TY');
+  </script>
+</body>
+</html>
