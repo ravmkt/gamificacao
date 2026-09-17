@@ -7,8 +7,8 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { dbAdmin } from '@/db/admin';
 import { schema } from '@/db';
 import { gerarSlugComSufixo } from '@/lib/slug';
-import { gerarParDeChaves, hashIpDeHeaders } from '@/lib/crypto';
-import { headers } from 'next/headers';
+import { gerarParDeChaves } from '@/lib/crypto';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 const cadastroSchema = z.object({
   nome: z.string().min(2, 'Informe seu nome completo.'),
@@ -104,16 +104,18 @@ export async function cadastrarLojista(input: unknown): Promise<CadastroResultad
         secretaUltimos4,
       });
 
-      const ipHash = await hashIpDeHeaders(await headers());
-
-      await tx.insert(schema.logsDeAuditoria).values({
-        lojaId: loja.id,
-        usuarioId,
+      return loja;
+    }).then(async (loja) => {
+      // Fora da transação principal (mas ainda antes do retorno de sucesso):
+      // registrarAuditoria usa dbAdmin com sua própria conexão, então não
+      // precisa (nem deve) participar da mesma transação atômica acima.
+      await registrarAuditoria({
         acao: 'criar',
         entidadeTipo: 'loja',
         entidadeId: loja.id,
+        lojaId: loja.id,
+        usuarioId,
         detalhes: { origem: 'cadastro' },
-        ipHash,
       });
     });
   } catch (e) {
@@ -141,7 +143,7 @@ export async function loginLojista(input: unknown): Promise<LoginResultado> {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.senha,
   });
@@ -150,11 +152,43 @@ export async function loginLojista(input: unknown): Promise<LoginResultado> {
     return { sucesso: false, erro: 'E-mail ou senha incorretos.' };
   }
 
+  if (data.user) {
+    const [membro] = await dbAdmin
+      .select({ lojaId: schema.membrosDaLoja.lojaId })
+      .from(schema.membrosDaLoja)
+      .where(eq(schema.membrosDaLoja.usuarioId, data.user.id))
+      .limit(1);
+
+    await registrarAuditoria({
+      acao: 'login',
+      entidadeTipo: 'sessao',
+      lojaId: membro?.lojaId ?? null,
+      usuarioId: data.user.id,
+    });
+  }
+
   return { sucesso: true };
 }
 
 export async function logoutLojista(): Promise<void> {
   const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.auth.getUser();
+
+  if (data.user) {
+    const [membro] = await dbAdmin
+      .select({ lojaId: schema.membrosDaLoja.lojaId })
+      .from(schema.membrosDaLoja)
+      .where(eq(schema.membrosDaLoja.usuarioId, data.user.id))
+      .limit(1);
+
+    await registrarAuditoria({
+      acao: 'logout',
+      entidadeTipo: 'sessao',
+      lojaId: membro?.lojaId ?? null,
+      usuarioId: data.user.id,
+    });
+  }
+
   await supabase.auth.signOut();
 }
 
@@ -197,10 +231,18 @@ export async function redefinirSenha(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.updateUser({ password: parsed.data.novaSenha });
+  const { data, error } = await supabase.auth.updateUser({ password: parsed.data.novaSenha });
 
   if (error) {
     return { sucesso: false, erro: 'Não foi possível redefinir a senha. O link pode ter expirado.' };
+  }
+
+  if (data.user) {
+    await registrarAuditoria({
+      acao: 'editar',
+      entidadeTipo: 'senha_usuario',
+      usuarioId: data.user.id,
+    });
   }
 
   return { sucesso: true };
