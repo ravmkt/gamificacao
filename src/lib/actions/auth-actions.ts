@@ -174,8 +174,11 @@ export async function solicitarRecuperacaoSenha(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
   // Não revelamos se o e-mail existe ou não (evita enumeração de contas).
+  // redirectTo aponta para o callback PKCE, que troca o code por sessão e
+  // só então encaminha para /redefinir-senha (onde o usuário já está
+  // autenticado e pode chamar redefinirSenha()).
   await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${appUrl}/redefinir-senha`,
+    redirectTo: `${appUrl}/auth/callback?next=/redefinir-senha`,
   });
 
   return { sucesso: true };
