@@ -46,3 +46,18 @@ export async function hashIpDoRequest(request: Request): Promise<string | null> 
 }
 
 type ReadonlyHeaders = { get(name: string): string | null };
+
+/** Gera uma assinatura HMAC-SHA256 (hex) de `payload` usando `segredo` — usado para assinar webhooks. */
+export async function hmacSha256Hex(segredo: string, payload: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(segredo),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const assinatura = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+  return Array.from(new Uint8Array(assinatura))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
