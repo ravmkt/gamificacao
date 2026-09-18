@@ -215,6 +215,23 @@ export async function solicitarRecuperacaoSenha(
     redirectTo: `${appUrl}/auth/callback?next=/redefinir-senha`,
   });
 
+  // Auditoria da SOLICITAÇÃO (evento de segurança), independente do e-mail
+  // existir ou não — a resposta ao chamador continua genérica (sem
+  // enumeração de contas); o lookup abaixo é só para anexar usuarioId
+  // quando existir, e nunca altera o comportamento observável da resposta.
+  const [usuarioExistente] = await dbAdmin
+    .select({ id: schema.usuarios.id })
+    .from(schema.usuarios)
+    .where(eq(schema.usuarios.email, parsed.data.email))
+    .limit(1);
+
+  await registrarAuditoria({
+    acao: 'criar',
+    entidadeTipo: 'solicitacao_recuperacao_senha',
+    usuarioId: usuarioExistente?.id ?? null,
+    detalhes: { email: parsed.data.email },
+  });
+
   return { sucesso: true };
 }
 
