@@ -28,6 +28,19 @@ export type CadastroResultado =
  * (`lojas`), o vínculo (`membros_da_loja` como proprietário), a assinatura
  * inicial (plano gratuito/trial) e o par de chaves de API da loja.
  *
+ * IMPORTANTE: o usuário é criado via Admin API (`auth.admin.createUser`)
+ * com `email_confirm: true`, e NÃO via `supabase.auth.signUp()` client-side.
+ * Isso é intencional: este é um SaaS B2B (lojista, não consumidor final) e
+ * o projeto Supabase tem `mailer_autoconfirm: false` (confirmação de e-mail
+ * obrigatória por padrão) — usar `signUp()` aqui (a) não retorna sessão
+ * enquanto o e-mail não for confirmado, quebrando o redirecionamento
+ * imediato para o painel, e (b) está sujeito ao rate limit de envio de
+ * e-mail do provedor (poucas tentativas por hora), o que bloquearia testes
+ * e até cadastros legítimos em sequência. Criando já confirmado, autenticamos
+ * a sessão manualmente com `signInWithPassword()` a seguir — sem depender
+ * de e-mail nesta etapa (etapa futura pode reintroduzir verificação real,
+ * se desejado, como um passo opcional pós-cadastro).
+ *
  * Se qualquer etapa após a criação no Auth falhar, o usuário do Auth é
  * removido (rollback manual, já que Auth e Postgres são sistemas distintos).
  */
@@ -39,19 +52,20 @@ export async function cadastrarLojista(input: unknown): Promise<CadastroResultad
   }
   const { nome, nomeDaLoja, email, senha } = parsed.data;
 
-  const supabase = await createSupabaseServerClient();
+  const admin = createSupabaseAdminClient();
 
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+  const { data: createData, error: createError } = await admin.auth.admin.createUser({
     email,
     password: senha,
-    options: { data: { nome } },
+    email_confirm: true,
+    user_metadata: { nome },
   });
 
-  if (signUpError) {
-    return { sucesso: false, erro: traduzErroSupabase(signUpError.message), campo: 'email' };
+  if (createError) {
+    return { sucesso: false, erro: traduzErroSupabase(createError.message), campo: 'email' };
   }
 
-  const usuarioId = signUpData.user?.id;
+  const usuarioId = createData.user?.id;
   if (!usuarioId) {
     return { sucesso: false, erro: 'Não foi possível criar o usuário. Tente novamente.' };
   }
@@ -120,10 +134,22 @@ export async function cadastrarLojista(input: unknown): Promise<CadastroResultad
     });
   } catch (e) {
     // Rollback manual do usuário no Auth, já que a transação Postgres falhou.
-    const admin = createSupabaseAdminClient();
     await admin.auth.admin.deleteUser(usuarioId).catch(() => {});
     console.error('Erro ao provisionar loja no cadastro:', e);
     return { sucesso: false, erro: 'Erro ao criar sua conta. Tente novamente em instantes.' };
+  }
+
+  // Autentica a sessão do lojista recém-criado (grava os cookies via
+  // createSupabaseServerClient, que já está ligado aos cookies da resposta
+  // atual do Next.js) — necessário porque createUser() via Admin API não
+  // gera sessão por si só (diferente de signUp()).
+  const supabase = await createSupabaseServerClient();
+  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: senha });
+  if (signInError) {
+    // Conta e loja já foram criadas com sucesso — apenas o login automático
+    // falhou. Não desfazemos o cadastro; o usuário pode logar manualmente.
+    console.error('Conta criada, mas login automático falhou:', signInError.message);
+    return { sucesso: true };
   }
 
   return { sucesso: true };
