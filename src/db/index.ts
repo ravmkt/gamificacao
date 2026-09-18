@@ -11,7 +11,6 @@ import * as schema from './schema';
  * (transaction mode, porta 6543) — ver .env.local para detalhes.
  */
 declare global {
-  // eslint-disable-next-line no-var
   var __dbClient: postgres.Sql | undefined;
 }
 

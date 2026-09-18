@@ -16,7 +16,6 @@ import * as schema from './schema';
  * `withTenantContext` (src/db/tenant-context.ts) com o cliente `db` normal.
  */
 declare global {
-  // eslint-disable-next-line no-var
   var __dbAdminClient: postgres.Sql | undefined;
 }
 

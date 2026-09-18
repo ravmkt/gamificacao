@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // public/widget.js é gerado (minificado via terser) a partir de
+    // widget-src/widget.js — não deve ser lintado como código-fonte.
+    "public/widget.js",
   ]),
 ]);
 

@@ -15,7 +15,7 @@
   var API_ORIGEM = (function () {
     try {
       return new URL(scriptTag.src).origin;
-    } catch (e) {
+    } catch {
       return '';
     }
   })();
@@ -73,7 +73,7 @@
     }
     var salvo = getCookie(COOKIE_ORIGEM);
     if (salvo) {
-      try { return JSON.parse(salvo); } catch (e) {}
+      try { return JSON.parse(salvo); } catch { /* ignora JSON invalido */ }
     }
     return utms;
   }

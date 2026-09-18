@@ -1,5 +1,4 @@
 import { sql } from 'drizzle-orm';
-import type { PgTransaction } from 'drizzle-orm/pg-core';
 import { db, schema } from './index';
 
 /**
