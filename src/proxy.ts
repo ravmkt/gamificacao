@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  * (refresh de token) em cada requisição, e redireciona para /login
  * usuários não autenticados tentando acessar rotas protegidas do painel.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
